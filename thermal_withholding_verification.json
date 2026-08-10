@@ -1,0 +1,45 @@
+{
+  "version": "v6.0.2-anomaly-withholding-remediation",
+  "detector_version": "1.1.0",
+  "scope": "anomaly-only causal replay over the three thermal_leads / variable_mixed_load lifecycles from invalid_rows.zip",
+  "lifecycles": {
+    "lifecycle_0007": {
+      "rows": 14548,
+      "old_hold": 3,
+      "old_suspend": 13862,
+      "new_hold": 3,
+      "new_suspend": 0,
+      "new_reduced": 13862,
+      "old_prediction_disabled_rows": 13865,
+      "new_prediction_disabled_rows": 3,
+      "old_prediction_disabled_rate": 0.9530519659059664,
+      "new_prediction_disabled_rate": 0.00020621391256530106
+    },
+    "lifecycle_0015": {
+      "rows": 33533,
+      "old_hold": 3,
+      "old_suspend": 32937,
+      "new_hold": 3,
+      "new_suspend": 0,
+      "new_reduced": 32937,
+      "old_prediction_disabled_rows": 32940,
+      "new_prediction_disabled_rows": 3,
+      "old_prediction_disabled_rate": 0.9823159275937137,
+      "new_prediction_disabled_rate": 8.946410998121254e-05
+    },
+    "lifecycle_0023": {
+      "rows": 53006,
+      "old_hold": 3,
+      "old_suspend": 52454,
+      "new_hold": 3,
+      "new_suspend": 0,
+      "new_reduced": 52454,
+      "old_prediction_disabled_rows": 52457,
+      "new_prediction_disabled_rows": 3,
+      "old_prediction_disabled_rate": 0.9896426819605327,
+      "new_prediction_disabled_rate": 5.6597366335886505e-05
+    }
+  },
+  "interpretation": "Persistent/correlated physically valid machine-regime changes remain auditable and retraining-ineligible but no longer disable prediction. Initial 3-row causal confirmation windows remain held.",
+  "limitation": "This is an anomaly-policy replay, not a full prognostic accuracy reevaluation. Re-run the normal replay/evaluator to measure event recall/precision after this code change."
+}

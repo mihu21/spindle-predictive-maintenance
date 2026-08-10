@@ -1,0 +1,18 @@
+{
+  "minimum_degraded_minutes": 30,
+  "normal_confirmation_minutes": 60,
+  "medium_confirmation_multiplier": 1.5,
+  "pre_reset_window_minutes": 60,
+  "post_reset_window_minutes": 60,
+  "minimum_lifecycle_hours": 12,
+  "reset_cooldown_hours": 2,
+  "minimum_improved_sensor_count": 2,
+  "minimum_sensor_drop_fraction": 0.20,
+  "minimum_overall_severity_drop": 0.30,
+  "healthy_baseline_tolerance": 0.35,
+  "warning_confirmation_minutes": 30,
+  "critical_confirmation_minutes": 30,
+  "normal_reset_confirmation_minutes": 60,
+  "minimum_critical_duration_before_reset_minutes": 30,
+  "maximum_confirmation_gap_minutes": 5
+}

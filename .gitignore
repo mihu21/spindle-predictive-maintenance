@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.venv-win/
+.deps311/
+.wheelhouse/
+output/*.db
+output/*.csv

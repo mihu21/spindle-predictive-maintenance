@@ -1,0 +1,56 @@
+Implementation date: 2026-08-06 Asia/Taipei
+Delivery revision: _009 (bidirectional trigger checks, source attribution, nested trace consistency, legacy-promotion rejection)
+Project version / Git commit: unavailable (workspace .git metadata is not a usable repository)
+Source workspace: C:\Users\MiHu\Documents\magang\ml\spindle_clean_test
+Final ZIP path: C:\Users\MiHu\Documents\magang\ml\spindle_clean_test\spindle_forecast_policy_clean_20260806_009.zip
+Final ZIP file count: 81 (verified after final source test run)
+Final ZIP compressed size: recorded in the final verification report (manifest is packaged before compression).
+
+Largest 20 staged files (bytes):
+  src/spindle_monitor/storage.py 58128
+  src/spindle_monitor/retraining.py 50330
+  src/spindle_monitor/monitor.py 45367
+  src/spindle_monitor/anomaly.py 40064
+  src/spindle_monitor/cli.py 34264
+  IMPLEMENTATION_REPORT.md 32623
+  evaluate_monitoring.py 30484
+  spindle_model_validation_fix_spec.md 25230
+  tests/test_anomaly_corrections.py 20090
+  src/spindle_monitor/config.py 19716
+  src/spindle_monitor/ml_forecaster.py 18121
+  src/spindle_monitor/guardrail_evaluation.py 17566
+  src/spindle_monitor/data_profile.py 16044
+  src/spindle_monitor/model_registry.py 15656
+  src/spindle_monitor/models.py 15566
+  README.md 14972
+  src/spindle_monitor/lifecycle_detector.py 14777
+  tests/test_model_validation_fixes.py 14067
+  src/spindle_monitor/feature_engineering.py 13962
+  src/spindle_monitor/offline.py 13504
+
+Included top-level directories: src, tests, config, docs, data/anomaly_fixtures, data/profile_validation_cases
+Included root files: README.md, IMPLEMENTATION_REPORT.md, evaluate_monitoring.py,
+main.py, evaluate.py, evaluate_fp_rate.py, validate_compare.py, augment_environment_metadata.py,
+verify_anomaly_corrections.py, verify_final_artifacts.py, requirements.txt, requirements-lock.txt,
+reproduce.ps1, build_portable_zip.py, build_packages.ps1, spindle_model_validation_fix_spec.md.
+
+Excluded categories: virtual environments; VCS/editor/cache folders; generated outputs and reports;
+databases/logs/temp/backup files; ZIPs; raw, generated, plant, realistic, accelerated and FP-test datasets;
+large model binaries. Bundled candidate models are intentionally omitted because they are synthetic and
+not production eligible. No model binary is needed by the included unit tests.
+
+Validation commands:
+  .\.venv-win\Scripts\python.exe -m unittest discover -s tests -q
+  .\.venv-win\Scripts\python.exe -m compileall src
+  .\.venv-win\Scripts\python.exe evaluate_monitoring.py --replay <replay.csv>
+
+Final test result: 147 tests passed in the source workspace and 147 tests passed from a fresh extracted ZIP; compileall and smoke import passed in both locations. pytest was attempted but is not
+installed in the supplied virtual environment; the Windows python launcher failed before invoking it.
+
+Known limitations: The bundled realistic candidates are synthetic integration artifacts and must not be
+promoted to plant production. No eligible deployed plant model is shipped, so current replay safety is
+through withholding rather than a claim of predictive accuracy. Statistical forecasts are diagnostics-only.
+
+Install: create an environment, then run `python -m pip install -r requirements-lock.txt`.
+Retraining: run the documented CLI/reproduce.ps1 against authorized, validated plant data; generated
+datasets and evaluation outputs are intentionally not shipped and must be regenerated locally.

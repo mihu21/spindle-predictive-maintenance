@@ -1,0 +1,57 @@
+{
+  "project": {
+    "name": "Spindle Predictive Maintenance",
+    "threshold_source": "Inferred from the supplied manufacturer-labelled dataset; verify against the official machine manual before production use",
+    "threshold_comparison": "greater_than"
+  },
+  "monitoring": {
+    "ewma_alpha": 0.1,
+    "history_size": 1440,
+    "forecast_window": 1440,
+    "minimum_forecast_points": 1440,
+    "minimum_forecast_r_squared": 0.3,
+    "warning_vote_window": 5,
+    "warning_votes_required": 3,
+    "normal_recovery_readings": 5,
+    "critical_recovery_readings": 5,
+    "kalman_process_variance": 5e-05,
+    "kalman_measurement_variance": 0.01,
+    "forecast_horizon_hours": 240.0,
+    "forecast_step_minutes": 10.0
+  },
+  "sensors": {
+    "vibration_mps2": {
+      "display_name": "Vibration",
+      "unit": "m/s^2",
+      "healthy_baseline": 1.0,
+      "warning": 3.0,
+      "critical": 4.0,
+      "valid_min": 0.0,
+      "valid_max": 20.0,
+      "severity_cap_value": 6.5,
+      "weight": 0.5
+    },
+    "temperature_c": {
+      "display_name": "Temperature",
+      "unit": "degC",
+      "healthy_baseline": 30.0,
+      "warning": 60.0,
+      "critical": 80.0,
+      "valid_min": -20.0,
+      "valid_max": 200.0,
+      "severity_cap_value": 110.0,
+      "weight": 0.3
+    },
+    "current_ampere": {
+      "display_name": "Current",
+      "unit": "A",
+      "healthy_baseline": 4.0,
+      "warning": 6.0,
+      "critical": 8.0,
+      "valid_min": 0.0,
+      "valid_max": 50.0,
+      "severity_cap_value": 10.0,
+      "weight": 0.2
+    }
+  }
+}

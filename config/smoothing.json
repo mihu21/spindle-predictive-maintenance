@@ -1,0 +1,8 @@
+{
+  "rolling_median_window": 5,
+  "fast_ewma_alpha": 0.35,
+  "slow_ewma_alpha": 0.10,
+  "kalman_process_variance": 0.00005,
+  "kalman_measurement_variance": 0.01,
+  "maximum_jump_multiplier": 4.0
+}
