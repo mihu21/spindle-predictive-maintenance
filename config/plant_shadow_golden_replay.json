@@ -1,0 +1,6 @@
+{
+  "golden_replay_version": "plant_shadow_golden_replay_v1",
+  "model_artifact_sha256": "ecad8f4f704129a3f0456c3c8dd47aabeb94ea6dfbdfd4c264313aea46076b9a",
+  "row_count": 24,
+  "canonical_output_sha256": "dfed03ffb3d083561a9ed8bc40c7f4baf80c2a3e3adcbf46abca6e0e9699ac43"
+}

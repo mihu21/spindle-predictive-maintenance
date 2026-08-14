@@ -1,193 +1,798 @@
-# Spindle Predictive Maintenance — V6 Model-Based Prognostics
+# Spindle Prognostics — IFM VVB001
 
-> **Current primary architecture (v6):** manufacturer safety + sensor-integrity anomaly handling + model-based probabilistic degradation forecasting. The supervised synthetic-lifecycle classifier from v4/v5.x is retained only for explicit research/audit comparison and is no longer the primary runtime forecast. See [docs/model_prognostics_v6.md](docs/model_prognostics_v6.md).
+A VVB001-native spindle condition-monitoring project for learning degradation patterns from `vrms`, `arms`, `apeak`, `crest`, and temperature. It uses synthetic lifecycles first to bootstrap and test the learning pipeline, then can run the same feature/model pipeline on the real VVB001 PostgreSQL data.
 
-V6 does **not** require generation of another large synthetic dataset or supervised failure-model training. It estimates persistent multi-timescale degradation rate and uncertainty directly from the observed sensor history, then forecasts manufacturer threshold first-passage time to produce WARNING/CRITICAL ETA and 6/12/24h probabilities. Raw manufacturer WARNING/CRITICAL behavior remains immediate and authoritative.
-
-Quick start on the current one-machine CSV:
-
-```powershell
-Unblock-File .\run_prognostics_v6.ps1
-.\run_prognostics_v6.ps1
-```
-
-The runner enables anomaly auditing by default, skips SQLite unless `-WithDatabase` is supplied, and does not run legacy ML unless `-LegacyMLAudit` is supplied.
-
----
-
-## Historical v5.x supervised-model documentation
-
-This project combines authoritative manufacturer rules, causal statistical forecasts, and optional lifecycle-trained ML. It forecasts physical progression to `WARNING` and `CRITICAL`; it never predicts maintenance or reset timing.
-
-The current forecast metadata/policy contract is schema 3.0 with independent
-per-target eligibility. The full FP/FN remediation report, verified stress
-metrics, and exact PowerShell commands are in
-[docs/forecast_policy_remediation.md](docs/forecast_policy_remediation.md).
-
-## Fixed input and safety contract
-
-The required input CSV remains exactly `timestamp`, `vibration_mps2`, `temperature_c`, `current_ampere`, and `health_status`. The label is validation-only. Runtime status comes from the raw sensors and manufacturer thresholds. Raw critical forces both primary and conservative times to zero and `IMMEDIATE_MAINTENANCE_REQUIRED`; ML cannot weaken it. Reset-candidate suppression and confirmed-boundary state clearing remain unchanged.
-
-An opt-in conservative anomaly/data-quality layer now keeps safety status separate from model usability. Use `replay --anomaly-audit` to audit malformed data, gaps, causal spike/persistence, context-backed stuck suspicion, clipping, robust excessive noise, disagreement, correlated abrupt deterioration, and conservative drift. Raw critical protection remains immediate under every anomaly action. Naturally constant sensors remain valid unless exact repetition persists through meaningful related operating changes and the sensor-specific response delay. See [docs/anomaly_handling.md](docs/anomaly_handling.md). Defaults are engineering assumptions requiring plant calibration; this is not a plant-safety or deployment-readiness claim.
-
-Detector 1.1.0 distinguishes **prediction-invalid sensor/data failures** from **physically valid machine/regime changes**. Persistent or correlated machine-change observations now keep prognostic outputs available at reduced confidence, are excluded from retraining pending review, and cannot generate an actionable ML maintenance recommendation while raw manufacturer status remains NORMAL.
-
-Held anomaly rows now remain outside rolling and smoothing feature history, with an explicit `feature_history_action`; raw values remain permanently audited. Short gaps are detected from expected cadence even when interpolation is disabled. Multi-sensor abrupt correlation enforces its configured time window. SQLite maintains independent current state and consolidated logical intervals in addition to immutable event rows, so normal recovery clears current state without deleting history.
-
-## Lifecycle and model validation
-
-Offline replay and training use the same two-pass confirmed boundaries. `raw_status` is the immediate manufacturer result, `stabilized_status` is the operational debounce result, and `event_status` is the independent elapsed-time-confirmed lifecycle result. Lifecycle metadata stores `first_raw_*` and `first_confirmed_*` timestamps separately. Warning and critical regression targets use only confirmed timestamps; a temporary raw crossing is never a target. Raw critical protection remains immediate.
-
-Training examples are strictly pre-event with positive targets. Lifecycle groups are deterministic and disjoint; critical stratification is attempted only when both classes have enough lifecycles. Split reports always show duration buckets, operating regime, warning/critical reach, censoring, and degradation family and explicitly state when joint stratification is impossible. Models fit training lifecycles, selection uses validation lifecycles, and test lifecycles remain untouched until one final report.
-
-## Runtime forecast concepts
-
-Four concepts are intentionally separate:
-
-- `primary_forecast` is the best estimated remaining time. Valid, in-distribution, promoted ML is primary.
-- `conservative_alert_forecast` is an optional earlier safety value. When strong disagreement has ML later than statistics, ML remains primary and the statistical value is exposed here. When ML is earlier, ML is already conservative. Values are never silently averaged.
-- `confidence` describes trust in the primary estimate. Strong disagreement downgrades confidence but does not erase valid ML.
-- `disagreement` is the absolute and relative difference between methods. Disagreement with a weaker baseline is evidence to audit, not automatically an ML failure.
-
-Model uncertainty is distinct from disagreement. Missing ML, incompatible schemas, and out-of-distribution features concern whether ML is usable. OOD is defined by the stored training feature envelope; an acceptable statistical forecast is used as fallback, otherwise the target is withheld with `distribution_check`. Reset suppression, missing ML, distribution failure, and logical consistency have explicit withholding causes. Disagreement alone does not withhold.
-
-For each target:
+Expected PostgreSQL columns:
 
 ```text
-absolute = abs(ML - statistical)
-relative = absolute / max(abs(ML), abs(statistical), 1e-6)
-strong = absolute > target_absolute_threshold
-         AND relative > disagreement_relative_threshold
+id, timestamp, line_sel, machine_id, vrms, arms, apeak, crest, temp
 ```
 
-The current realistic-synthetic validation-selected configuration is:
+PostgreSQL is **read-only**. All checkpoints, features, predictions, audits, SQLite data, and CSV exports are stored locally.
+
+## Pipeline
 
 ```text
-warning_disagreement_absolute_hours = 23.464004
-critical_disagreement_absolute_hours = 76.987250
-disagreement_relative_threshold = 0.997358
+BOOTSTRAP DEVELOPMENT
+
+improved synthetic VVB001 lifecycles
+  - one line by default
+  - multiple machine_id values
+  - different healthy baselines per machine
+  - bearing / unbalance / lubrication / looseness /
+    thermal / sudden-impact / mixed degradation modes
+        ↓
+VVB001 validation
+        ↓
+per-machine causal feature engine
+  - rolling statistics
+  - EWMA / rates / trends
+  - per-machine baseline deltas / ratios / z-scores
+        ↓
+NO NORMAL/WARNING/CRITICAL training labels
+        ↓
+unsupervised regime discovery
+        ↓
+early lifecycle used only as a healthy anchor
+        ↓
+learned regime ordering
+        ↓
+continuous degradation score 0..1
+        ↓
+learned NORMAL / WARNING / CRITICAL regimes
+        ↓
+models/vvb001_bootstrap.joblib
+
+REAL RUNTIME
+
+IFM VVB001 → PostgreSQL → SELECT only
+        ↓
+same validation + feature engine
+        ↓
+same learned degradation model
+        ↓
+smoothed degradation score + status
+        ↓
+dedicated learned RUL ML v2.1 with v2 + legacy trend fallback
+  - hours to WARNING
+  - hours to CRITICAL / remaining useful life
+  - uncertainty range + reliability
+        ↓
+local SQLite / CSV / checkpoint only
 ```
 
-Candidates came from the 50th, 75th, and 90th percentiles of training-lifecycle disagreement only. Validation selected among those candidates by retaining at least 90% of the maximum validation recall for unsafe-late cases, then minimizing low-confidence rows and withholding. The selected configuration was evaluated once on the untouched test lifecycles. The JSON report includes coverage, MAE, bias, p90 error, low-confidence and withheld percentages, unsafe-late rates, and per-lifecycle results.
+## How the model learns the states
 
-Warning primary time may never exceed critical primary time when both exist. A logical inconsistency remains a separate failure: both primary values are withheld without swapping or averaging. Offline replay batches estimator calls for performance only; feature generation, lifecycle state, manufacturer rules, and row-level policy remain causal and ordered.
+The mock training CSV deliberately has **no `health_status` column**. The learner does not receive fixed sensor thresholds such as `vrms > X = WARNING`.
 
-## Commands
+Instead it:
 
-Create the deterministic tested environment with CPython 3.14.6. The broad
-`requirements.txt` remains useful for development, while the lock file is the
-authoritative reproduction environment:
+1. Separates every lifecycle and every `(line_sel, machine_id)` stream.
+2. Builds a short healthy reference from the beginning of each lifecycle.
+3. Converts absolute readings into relative features such as deviation from that machine's baseline, ratios, z-scores, trends, and rolling variation.
+4. Uses unsupervised clustering to discover three recurring operating/degradation regimes.
+5. Identifies the healthiest discovered regime from the early-lifecycle anchor samples.
+6. Orders the remaining regimes using where they naturally occur in the lifecycle.
+7. Produces a continuous degradation score from 0 to 1 and maps the learned regimes to `NORMAL`, `WARNING`, and `CRITICAL`.
+8. Smooths the live degradation score using elapsed time (not row count) and applies hysteresis around the learned regime boundaries so single noisy readings do not cause rapid status flicker.
+
+The default early anchor is the first 15% of each bootstrap lifecycle. That is **not** a WARNING/CRITICAL threshold; it is only the assumption that a lifecycle begins after maintenance in a relatively healthy condition.
+
+The synthetic generator also writes `latent_damage_score` and `fault_mode`, but they are **audit fields only**. They are never used to train the regime model.
+
+## 1. Install
+
+Windows PowerShell:
 
 ```powershell
-py -3.14 -m venv .venv-win
-.\.venv-win\Scripts\python.exe -m pip install --requirement requirements-lock.txt
-.\.venv-win\Scripts\python.exe -m pip check
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
-The 2026-08-07 long-lifecycle model-generalization research candidate is
-documented in `docs/model_generalization_remediation.md`. It failed required
-target and external long-normal acceptance evidence, remains isolated under
-`models/generalization_v3/realistic`, and did not replace the verified baseline.
-
-Candidate metadata and evaluation reports record Python, platform, NumPy,
-pandas, SciPy, scikit-learn, joblib, threadpoolctl, python-dateutil, six, and
-tzdata versions. Loading refuses material Python/scikit-learn/NumPy/joblib
-incompatibilities and warns when legacy metadata has no training environment.
-
-```bash
-python -m unittest discover -s tests -v
-
-python main.py evaluate-guardrails \
-  --input data/spindle_predictive_maintenance_mock.csv \
-  --models-root models \
-  --output output/mock_guardrail_evaluation.json
-
-python main.py replay \
-  --input data/spindle_predictive_maintenance_mock.csv \
-  --csv output/mock_replay_revised_guardrail.csv \
-  --lifecycles-csv output/mock_lifecycles_revised_guardrail.csv \
-  --invalid-csv output/mock_invalid_rows_revised_guardrail.csv \
-  --database output/mock_monitor_revised_guardrail.db \
-  --progress-every 5000
-```
-
-Training and explicit promotion remain:
-
-```bash
-python main.py train --input data/spindle_predictive_maintenance_mock.csv \
-  --database output/mock_monitor.db --metrics output/mock_model_metrics.json
-
-python main.py evaluate-model --database output/mock_monitor.db \
-  --output output/mock_model_evaluation_after_promotion.json --promote
-```
-
-## Limitations
-
-The bundled data is synthetic. These metrics validate software behavior and a reproducible backtest, not real spindle accuracy, calibration, safety, or deployment readiness. “Unsafe-late rate” currently means any positive prediction error, with no plant-approved tolerance, so it is deliberately sensitive. Only four validation and four test lifecycles are available. Real deployment needs representative plant regimes, confirmed labels, approved alert tolerances, drift monitoring, prospective validation, and human-reviewed promotion.
-
-## Data domains and realistic-data readiness
-
-`profile-data` calls the same `InputValidator` as replay and offline training.
-Its `input_validation` block reports valid/invalid row counts, exact reason
-counts, and representative row/timestamp examples. Those failures are also
-carried into suitability refusals. The shipped negative fixtures cover an
-out-of-range sensor, an impossible jump, an unknown status, and a duplicate
-timestamp.
-
-For realistic-synthetic files with explicit maintenance metadata, lifecycle
-IDs and boundaries remain metadata-authoritative while the replay audit state
-is assigned causally as `HEALTHY`, `DEGRADING`, `WARNING`, `CRITICAL`,
-`RECOVERY_CONFIRMATION`, or `RESET_COMPLETE`. `lifecycle_state` is audit-only:
-it is not a model feature or label. `elapsed_lifecycle_hours` remains in the
-runtime feature schema for audit/support evidence, but new ETA and probability
-estimators exclude absolute lifecycle age from predictive inputs; its boundary
-calculation is unchanged. The first observation has
-unknown source cadence (blank CSV / SQL `NULL`) and a zero elapsed sampling gap;
-it is never reported as a fabricated one-second source interval.
-
-The repository has three auditable domains. `accelerated_mock` is for fast software correctness and keeps the existing accelerated dataset. `realistic_synthetic` is for realistic-duration integration and candidate-model testing. `plant` is reserved for actual plant evidence. Their roots are `models/mock`, `models/realistic`, `models/plant` and `output/mock`, `output/realistic`, `output/plant`. Synthetic candidates cannot become `plant_production`; refusal reasons are written to CLI JSON, registry audit JSONL, and SQLite evaluation records.
-
-Sampling rate and degradation rate are different. A one-minute sample rate describes observation cadence; it does not imply that a spindle degrades in minutes. Accelerated degradation is useful for quick reset, replay, and safety-policy tests, but its accuracy metrics are not real-world accuracy. The 6 h, 12 h, and 24 h probability names are event horizons, not maximum lifecycle lengths.
-
-The fixed input contract remains exactly `timestamp`, `vibration_mps2`, `temperature_c`, `current_ampere`, and `health_status`. Lifecycle completion requires a confirmed reset or explicit maintenance record. A file ending in normal, warning, or critical state is `open_normal`, `open_warning`, or `open_critical` and censored. Open/censored rows are not exact remaining-time regression labels. Shipped training defaults require 10 completed lifecycles, at least 4 validation lifecycles, and at least 4 untouched test lifecycles; plant promotion evaluation requires 20.
-
-Features use causal 5 min, 15 min, 30 min, 1 h, 3 h, 6 h, 12 h, and 24 h timestamp windows. Every window reports available history duration, coverage fraction, maturity, sample count, and gap/discontinuity. Gap/interpolation behavior is configured in `config/data.json`. Offline preparation, training, and replay share `safe_resample`; interpolation is off by default and, when enabled, is limited to short normal-to-normal spans. It never crosses explicit/inferred lifecycle boundaries, long outages, or warning/critical spans. Large gaps either mark features unavailable or reject input according to `large_gap_policy`. The live online monitor does not interpolate; it processes observations causally as received.
-
-The normal replay CSV is the audit export (no hidden detailed flag is required). Stable columns include row provenance; domain, dataset, generator, stage and model version; raw/stabilized/event status; lifecycle and censoring state; feature/history maturity; source/effective cadence and sampling OOD; raw ML predictions and confirmed targets; confidence/support/physical-validity flags; guardrail outcome; and fallback/refusal reason. SQLite stores the same audit payload plus indexed operational columns.
-
-With anomaly auditing enabled, the same CSV and SQLite rows also include `quality_status`, detailed `anomaly_type`, safety/model actions, affected sensors, confidence multiplier, causal and offline decisions, evidence/configuration snapshots, and training eligibility. Invalid rows carry parallel fields. SQLite migration is additive and includes `anomaly_events`. `evaluate-anomalies`, `summarize-anomalies`, `export-anomaly-intervals`, `inspect-anomaly-state`, and `explain-prediction` provide deterministic evaluation and audit inspection.
-
-Future plant training requires `--anomaly-screening`; an unscreened plant command is refused. `--reproduction-mode` intentionally preserves existing synthetic reproduction without changing model artifacts. `audit-training-screening` reports exclusions, human-review rows, interpolation policy, detector version, and configuration hash without training. Interval export supports JSON plus optional CSV, and `export-anomaly-events` retains a separate raw causal event export.
-
-Runtime predictions are never silently clipped. Both lower and upper training target support are checked. A negative raw prediction is retained for audit, marked outside support and physically invalid, assigned low confidence, and replaced operationally by an acceptable statistical fallback or withheld.
-
-Windows activation on Windows:
+For tests:
 
 ```powershell
-.\.venv-win\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
 ```
 
-Exact realistic workflow:
+## 2. Generate improved mock lifecycles
+
+Recommended default:
 
 ```powershell
-python -m unittest discover -s tests -v
-python main.py profile-data --input data/spindle_predictive_maintenance_10000_unlabeled.csv --output output/realistic/actual_data_profile.json --models-root models/realistic
-python main.py generate-realistic-mock --profile output/realistic/actual_data_profile.json --lifecycles 30 --output data/realistic_spindle_mock.csv --metadata-output data/realistic_spindle_mock_metadata.json --seed 42
-python main.py train-model --input data/realistic_spindle_mock.csv --data-domain realistic_synthetic --models-root models/realistic --metrics output/realistic/model_metrics.json --database output/realistic/training.db
-python main.py evaluate-model --models-root models/realistic --output output/realistic/model_evaluation.json --database output/realistic/training.db
-python main.py evaluate-guardrails --input data/realistic_spindle_mock.csv --models-root models/realistic --output output/realistic/guardrail_evaluation.json
-python main.py replay --input data/realistic_spindle_mock.csv --data-domain realistic_synthetic --models-root models/realistic --csv output/realistic/replay.csv --lifecycles-csv output/realistic/lifecycles.csv --invalid-csv output/realistic/invalid_rows.csv --database output/realistic/monitor.db --progress-every 5000
-python main.py evaluate-model --models-root models/realistic --output output/realistic/promotion_refusal.json --database output/realistic/training.db --promote
+python main.py generate-mock --lifecycles 50 --machines 6 --seed 42
 ```
 
-The existing `train` command remains as a backward-compatible alias of `train-model`. Full one-minute realistic training/replay is intentionally much slower than accelerated testing. `reproduce.ps1` installs the exact lock and runs the verified workflow. `build_packages.ps1` builds the clean source ZIP and separate large evidence bundle, rejects archive entries containing backslashes, and writes `package_manifest.json` beside both ZIPs as well as under `output`. See `docs/realistic_data_readiness.md` for configuration, audit details, actual metrics, and limitations.
+or simply:
 
-## Generalization v4 research remediation
+```powershell
+python main.py generate-mock
+```
 
-The rejected `generalization_v3` candidate remains isolated and `models/realistic` is unchanged. The v4 code path removes absolute/rolling level proxies from newly trained probability estimators, expands healthy high-load support with outcome-stratified duration coverage, adds locked-v3 multivariate/attribution diagnostics, and replaces the slow wide acceptance metric path with a narrow cached/vectorized evaluator. The runtime feature schema and manufacturer safety logic are unchanged.
+Default output:
 
-Run `run_generalization_v4.ps1` with no switches for diagnosis only. Research retraining requires the explicit `-RunResearchTraining` switch and writes only to `models/generalization_v4/realistic`; the script never promotes. See `docs/model_generalization_v4.md` for the exact workflow, safety constraints, and current limitation that v4 accuracy has not been measured in the packaged snapshot because the large local datasets/replays are not included.
+```text
+data/vvb001_mock_training.csv
+```
 
-### Generalization v5.2 research pass
+Columns:
 
-`run_generalization_v5_2.ps1` reuses the v4 development CSV and adds noise-normalized relative-state residuals, persistent trend signal-to-noise features, and training-only lifecycle-held-out hard-example mining for the required probability targets. It writes only to `models/generalization_v5_2/realistic` and `output/generalization_v5_2`; production promotion remains disabled. See `docs/model_generalization_v5_2.md`.
+```text
+id
+timestamp
+line_sel
+machine_id
+vrms
+arms
+apeak
+crest
+temp
+lifecycle_id
+lifecycle_progress
+latent_damage_score
+fault_mode
+operating_state
+operating_state_source
+operating_state_confidence
+maintenance_event_id
+operating_elapsed_hours
+```
+
+By default, `line_sel` is always `LINE_1` while multiple `machine_id` values are generated, matching the structure you described in the real database.
+
+Useful options:
+
+```powershell
+python main.py generate-mock `
+    --lifecycles 80 `
+    --machines 8 `
+    --line-sel LINE_1 `
+    --cadence-seconds 60 `
+    --seed 42
+```
+
+To generate a runtime-test fixture containing sensor rows while the spindle is idle, off, under
+maintenance, or operationally unknown:
+
+```powershell
+python main.py generate-mock `
+    --output data\vvb001_operating_context_test.csv `
+    --lifecycles 8 `
+    --machines 4 `
+    --cadence-seconds 600 `
+    --seed 812 `
+    --duty-cycled-operating-context
+```
+
+This duty-cycled file is intentionally rejected by `train-mock`. It tests runtime gating and must
+not be used to train, calibrate, or select a model.
+
+For the no-machine-log path, add `--vibration-inference-fixture`. The generated CSV leaves visible
+operating-state fields blank and retains `synthetic_true_operating_state` only for runtime test
+assertions. This fixture is also rejected by training:
+
+```powershell
+python main.py generate-mock `
+    --output data\vvb001_vibration_operating_test.csv `
+    --lifecycles 8 `
+    --machines 4 `
+    --cadence-seconds 600 `
+    --seed 913 `
+    --duty-cycled-operating-context `
+    --vibration-inference-fixture
+```
+
+## 3. Train the bootstrap degradation model
+
+```powershell
+python main.py train-mock
+```
+
+Outputs:
+
+```text
+models/vvb001_bootstrap.joblib
+output/bootstrap_training_report.json
+```
+
+Or generate and train together:
+
+```powershell
+.\run_bootstrap_training.ps1
+```
+
+Training now uses three lifecycle-disjoint partitions: **fit**, **validation**, and untouched **test**. Rows from the same `lifecycle_id` are never mixed across these partitions. Fit rows are lifecycle-balanced so long trajectories cannot dominate the unsupervised clustering objective, with a modest `1 + 1.5 * progress^3` tail weight to stabilize the severe regime. `fault_mode` and `latent_damage_score` remain audit-only and do not affect fitting.
+
+The WARNING score boundary remains cluster-derived. The CRITICAL boundary is conservatively calibrated on validation lifecycles only: the code searches downward from the original cluster midpoint and selects the highest boundary that reaches the held-out late-tail target without materially worsening transition reversals. The untouched test lifecycles are evaluated only after calibration.
+
+The report does **not** report true plant FP/FN because the new learner is not trained from fixed NORMAL/WARNING/CRITICAL labels. Instead it reports useful bootstrap diagnostics such as:
+
+- early-anchor alert rate — how often early lifecycle data is assigned WARNING/CRITICAL
+- late critical coverage — how often the final 10% of synthetic lifecycles is assigned CRITICAL
+- degradation-score vs lifecycle-progress rank correlation
+- degradation-score vs hidden simulator damage rank correlation
+- regime separation (`silhouette_score`)
+- backward status-transition rate
+- per-fault-mode early-alert, late-CRITICAL, correlation, and per-lifecycle results
+
+These are still synthetic checks, not real-plant validation.
+
+## 4. Automated generalization evaluation
+
+After training, test the **saved model without retraining it** on fresh synthetic lifecycles generated from unseen random seeds:
+
+```powershell
+python main.py evaluate-generalization `
+    --model models/vvb001_bootstrap.joblib `
+    --report output/generalization_evaluation.json
+```
+
+For a model trained on 10-minute (`600` second) data, especially an older model created before cadence metadata was added, specify the cadence explicitly:
+
+```powershell
+python main.py evaluate-generalization `
+    --model models/model_10min.joblib `
+    --cadence-seconds 600 `
+    --trials 5 `
+    --lifecycles 30 `
+    --machines 6 `
+    --seed-start 1001 `
+    --report output/generalization_10min.json
+```
+
+What the command does:
+
+1. Loads the already-trained joblib bundle once.
+2. Generates fresh synthetic lifecycle datasets using seeds that are different from the bootstrap-development default.
+3. Runs the same validation and feature-engineering pipeline used for training/runtime.
+4. Evaluates the fixed model on every unseen lifecycle; it does **not** fit K-means, reorder regimes, or tune boundaries during the test.
+5. Writes per-trial metrics, aggregate stability statistics, each individual acceptance check, and an overall `PASS`/`FAIL` field to JSON.
+6. Deletes temporary synthetic CSVs automatically unless `--keep-generated-dir` is provided.
+
+Default synthetic-regime consistency gates are:
+
+```text
+early_anchor_alert_rate          <= 0.10
+late_critical_coverage           >= 0.20
+score_progress_spearman          >= 0.65
+score_latent_damage_spearman     >= 0.70
+transition_reversal_rate         <= 0.20
+```
+
+Every trial must satisfy every configured gate for `overall_pass=true`. These gates can be changed from the CLI for research/regression experiments, but do not loosen them merely to force a passing result.
+
+The JSON also contains `aggregate_per_fault_mode`, making it easier to see whether a particular synthetic fault family is responsible for weak late-CRITICAL coverage.
+
+### After upgrading from the previous model
+
+Existing `.joblib` files keep their old score boundaries. **Retrain the model** to use the lifecycle-balanced fit and held-out CRITICAL calibration:
+
+```powershell
+python main.py train-mock `
+    --input data\mock_10min.csv `
+    --model models\model_10min.joblib `
+    --report output\eval_10min.json
+```
+
+Then rerun the generalization evaluator. Do not reuse the old model file and expect the calibration fix to appear automatically.
+
+Useful options:
+
+```powershell
+python main.py evaluate-generalization --help
+```
+
+Important limitations:
+
+- This is a **synthetic generalization regression test**, not real-plant validation.
+- `latent_damage_score` and `lifecycle_progress` are simulator-only evaluation fields and are never model inputs.
+- A synthetic PASS does not establish real false-positive rate, real false-negative rate, maintenance lead time, or production safety.
+- For plant validation, collect real lifecycle/reset/maintenance evidence and evaluate the fixed model against that independent evidence.
+
+## 5. Versioned adversarial stress validation
+
+`evaluate-generalization` tests fresh seeds from the bootstrap-generator family. The separate `stress.py` framework tests adversarial trajectories and sensor faults through the **same guarded runtime monitor path** used for live predictions.
+
+`stress_v1`, `stress_v2`, `stress_v3`, and `stress_v4` have all now been consumed as development/acceptance evidence and are retained as **regression suites**. The RUL ML v2.1 update does not change the learned classifier, score smoothing, sensor-quality policy, or status thresholds.
+
+The runtime now has three narrow protections that do not retrain or globally retune the learned model:
+
+- sensor-fault rows quarantined by `SensorQualityGuard` use sanitized feature values;
+- the predictor captures a **pre-suspect checkpoint** and serves that trusted state for the whole quarantine episode, then rolls back to it on sensor recovery;
+- trusted sustained thermal evidence may bypass only the **upward hysteresis margin** after the learned degradation score has already reached the model's calibrated CRITICAL boundary. The learned boundary itself is not lowered.
+
+Run consumed suites only as regressions:
+
+```powershell
+python main.py evaluate-stress `
+    --model models\model_10min.joblib `
+    --suite-dir data\stress\stress_v1 `
+    --report output\stress\stress_v1_regression.json
+
+python main.py evaluate-stress `
+    --model models\model_10min.joblib `
+    --suite-dir data\stress\stress_v2 `
+    --report output\stress\stress_v2_regression.json
+
+python main.py evaluate-stress `
+    --model models\model_10min.joblib `
+    --suite-dir data\stress\stress_v3 `
+    --report output\stress\stress_v3_regression.json
+```
+
+`stress_v4` was previously run as the untouched acceptance suite before this RUL-only addition. Its frozen data remain included for classifier/status regression:
+
+- generator: `independent_adversarial_v4`
+- seed: `20260907`
+- cadence: 600 seconds
+- scenarios: 16
+- lifecycles: 32
+- rows: 12,888
+- current evidence role in this snapshot: `development_regression_consumed_v4`
+
+Run v4 as a regression check for the unchanged classifier/status path:
+
+```powershell
+python main.py evaluate-stress `
+    --model models\model_10min.joblib `
+    --suite-dir data\stress\stress_v4 `
+    --report output\stress\stress_v4_acceptance.json
+```
+
+The model-facing sensor CSV never contains hidden true state/damage/scenario/fault labels. SHA-256 hashes in every manifest are verified before evaluation. The prior v4 acceptance result applies to the unchanged classifier/status path; it does not validate the newly added RUL hours. Real RUL accuracy requires plant maintenance/failure timing evidence. None of these synthetic suites establish plant accuracy. See `STRESS_TEST.md`, `THERMAL_BIAS_REMEDIATION.md`, `PREDICTION_CHECKPOINT_REMEDIATION.md`, and `RUL_ESTIMATION.md`.
+
+## 6. Per-machine baseline behavior
+
+Every machine is isolated using:
+
+```text
+(line_sel, machine_id)
+```
+
+For example:
+
+```text
+LINE_1::MACHINE_01
+LINE_1::MACHINE_02
+LINE_1::MACHINE_03
+```
+
+Each stream has separate rolling history, EWMA state, and baseline statistics. A naturally higher-vibration machine therefore does not automatically inherit another machine's baseline.
+
+The local checkpoint also stores the frozen per-machine baseline statistics, so restarting the program does not redefine the baseline from scratch. Recent PostgreSQL history is replayed only to rebuild rolling/EWMA state.
+
+## 7. Configure PostgreSQL
+
+Edit:
+
+```text
+config/vvb001.json
+```
+
+Default mapping:
+
+```json
+{
+  "source_id": "id",
+  "timestamp": "timestamp",
+  "line_sel": "line_sel",
+  "machine_id": "machine_id",
+  "vrms": "vrms",
+  "arms": "arms",
+  "apeak": "apeak",
+  "crest": "crest",
+  "temp": "temp"
+}
+```
+
+If the real column names differ, change only this mapping.
+
+Set the acceleration unit correctly:
+
+```json
+"acceleration_unit": "m_s2"
+```
+
+or:
+
+```json
+"acceleration_unit": "g"
+```
+
+The model and live runtime must use the same feature configuration used during training.
+
+Keep credentials outside Git:
+
+```powershell
+$env:VVB001_POSTGRES_DSN = "postgresql://READ_ONLY_USER:PASSWORD@HOST:5432/DATABASE"
+```
+
+Use a PostgreSQL account with `SELECT` permission only when possible. The application additionally enables a read-only PostgreSQL session and contains no PostgreSQL write path.
+
+## 8. Run on the real database
+
+With the bootstrap model:
+
+```powershell
+python main.py monitor-postgres `
+    --config config/vvb001.json `
+    --model models/vvb001_bootstrap.joblib
+```
+
+or:
+
+```powershell
+.\run_vvb001_monitor.ps1
+```
+
+The runtime warns that a synthetic-trained model is provisional.
+
+To collect real VVB001 data without using any model:
+
+```powershell
+python main.py monitor-postgres --collect-only
+```
+
+To catch up currently available rows once and exit:
+
+```powershell
+python main.py monitor-postgres --once
+```
+
+For the first deployment, if you intentionally want to process all historical rows and there is no checkpoint yet:
+
+```powershell
+python main.py monitor-postgres --start-from-beginning --once
+```
+
+## 9. Local outputs
+
+Default files:
+
+```text
+output/vvb001_monitor.db
+output/vvb001_checkpoint.json
+```
+
+The local SQLite database stores:
+
+- original VVB001 readings
+- validation status
+- engineered features
+- learned `NORMAL/WARNING/CRITICAL` regime
+- class-like regime probabilities
+- continuous `degradation_score`
+- estimated hours to WARNING
+- estimated hours to CRITICAL / operational RUL
+- RUL lower/upper ranges, reliability, trend diagnostics and availability reason
+- sensor-quality/prediction-state audit fields
+- invalid-row audit data
+
+The checkpoint stores the last PostgreSQL `id` and the per-machine baseline state locally.
+
+## 10. Inspect real collected data
+
+Latest status and RUL for every monitored machine:
+
+```powershell
+python main.py show-latest
+```
+
+Example:
+
+```text
+LINE_1::VVB001 @ 2026-08-11T04:00:00+00:00
+  Status: NORMAL; degradation_score=0.22
+  Estimated time to WARNING: 12.5 h
+  Estimated time to CRITICAL / RUL: 31.0 h
+  RUL reliability: MEDIUM
+```
+
+`RUL` here is produced by the dedicated learned RUL ML v2.1 in newly trained bundles, using only causal sensor/degradation history. V2 artifacts retain their original behavior, while older bundles without learned RUL fall back to the trend estimator. It is **not yet a plant-validated physical lifetime prediction**. Sensor-quality quarantined rows cannot advance learned RUL state. See `RUL_ESTIMATION.md`.
+
+Aggregate and per-machine profile:
+
+```powershell
+python main.py profile-local
+```
+
+Export local readings/features/predictions/RUL:
+
+```powershell
+python main.py export-csv
+```
+
+Default export:
+
+```text
+output/vvb001_training_features.csv
+```
+
+## 11. Moving from synthetic bootstrap to real learning
+
+The bootstrap model proves the architecture and provides an initial degradation representation. It should not be treated as a validated maintenance decision system.
+
+The intended next progression is:
+
+```text
+synthetic bootstrap lifecycles
+        ↓
+learn/test degradation representation
+        ↓
+connect to real PostgreSQL read-only
+        ↓
+collect historical VVB001 data per machine
+        ↓
+identify real lifecycle/reset/maintenance boundaries
+        ↓
+fit the same lifecycle-aware learner on real lifecycles
+        ↓
+compare learned regimes with maintenance/failure evidence
+        ↓
+validate real false alarms, missed faults, and warning lead time
+        ↓
+promote a real-data model
+```
+
+A statistical regime can be discovered without manual labels, but calling it operationally `CRITICAL` still requires plant/maintenance validation before production use.
+
+
+## Test RUL before PostgreSQL
+
+**Retrain after this update.** Existing joblib bundles remain loadable but use the legacy trend RUL fallback because they do not contain the learned RUL v2 artifact.
+
+A live database is not required to validate the new RUL output. Generate a fresh unseen synthetic
+lifecycle set and evaluate the fixed model without retraining:
+
+```powershell
+python main.py generate-mock `
+    --lifecycles 30 `
+    --machines 6 `
+    --cadence-seconds 600 `
+    --seed 12001 `
+    --output data\rul_test_12001.csv
+
+python main.py evaluate-rul `
+    --model models\model_10min.joblib `
+    --input data\rul_test_12001.csv `
+    --report output\rul\rul_test_12001.json `
+    --predictions output\rul\rul_test_12001_predictions.csv
+```
+
+See `RUL_EVALUATION.md` for metrics, stress-suite evaluation, truth isolation, and interpretation.
+
+## RUL v2.6 target-specific development workflow
+
+RUL v2.6 keeps the v2.5 point models frozen and separates WARNING and CRITICAL
+forecastability, bias correction, asymmetric calibration, and runtime state. Its acceptance file
+is generated only after an exact final-artifact serialize/reload calibration replay passes:
+
+```powershell
+python main.py generate-rul-v2-6-preacceptance
+python main.py train-rul-v2-6
+python main.py generate-rul-v2-6-acceptance
+python main.py evaluate-rul-v2-6-development
+```
+
+Do not run the acceptance evaluation more than once. It permanently consumes that evidence.
+The full-cadence remediation passed exact final-artifact parity, target coverage, interval width,
+availability, breadth, support, and every horizon-bias gate except CRITICAL `<=6 h` (`+7.876 h`
+against `+/-6 h`). Its acceptance remains physically ungenerated and no sealed holdout is
+authorized. See `RUL_V2_6_IMPLEMENTATION_SUMMARY.md`.
+
+## RUL v2.7 identity-first CRITICAL remediation
+
+RUL v2.7 freezes the v2.6 Extra Trees estimators, target selectors, WARNING pipeline, features,
+generator, runtime state machine, and manufacturer overrides. CRITICAL identity is compared with
+one zero-anchored bounded correction and identity wins unless the learned alternative dominates
+across every supported horizon:
+
+```powershell
+python main.py generate-rul-v2-7-preacceptance
+python main.py train-rul-v2-7
+python main.py generate-rul-v2-7-acceptance
+python main.py evaluate-rul-v2-7-development
+```
+
+Fresh full-cadence evidence selected identity. Exact parity passed across 21,749 calibration rows,
+all preacceptance gates passed, and the one-time 19,534-row development acceptance passed. Final
+acceptance CRITICAL MAE was `3.534 h`, `<=6 h` bias was `+0.500 h`, coverage was `94.22%`, and
+monotonicity was `98.64%`. WARNING, CRITICAL, and system sealed-holdout creation are authorized,
+and the authorized sealed holdout has now been consumed exactly once:
+
+```powershell
+python main.py generate-rul-v2-7-sealed-holdout
+python main.py evaluate-rul-v2-7-sealed-holdout
+```
+
+The 8-batch, 64-lifecycle, 41,239-row sealed realistic-synthetic holdout passed every target and
+runtime gate. Sealed WARNING MAE was `2.756 h`; sealed CRITICAL MAE was `3.582 h`, with `+0.521 h`
+bias at `<=6 h`. The synthetic candidate is locked and both development acceptance and sealed
+evidence are permanently consumed. Plant shadow validation has not started and plant-production
+use remains unauthorized. See `RUL_V2_7_IMPLEMENTATION_SUMMARY.md` and
+`RUL_V2_7_SEALED_HOLDOUT_SUMMARY.md`.
+
+## Plant shadow, lifecycle evidence, API, and frontend
+
+The plant-shadow path wraps the frozen v2.7 artifact without changing its learned parameters. It uses a separate
+append-only SQLite evidence ledger, one stateful runtime per `source_key`, independent WARNING and
+CRITICAL truth policies, explicit censoring, and a localhost-only read API. It remains observational:
+plant-production authorization is false and there is no automatic retraining or machine control.
+
+Sensor connectivity and machine operation are separate contracts. Every raw sensor row is retained,
+but only `RUNNING` observations from a declared source with confidence at least 0.90 enter the
+feature/predictor/RUL runtime. `IDLE`, `OFF`, `MAINTENANCE`, low-confidence, contradictory, and
+`UNKNOWN` rows produce a `PAUSED` forecast with exact RUL values cleared. Extreme raw safety evidence
+remains immediate and does not advance degradation state. RUL values are explicitly operating hours,
+not calendar hours.
+
+When no machine-state database exists, leave the optional operating-context source mappings as
+`null`, as shown in `config/plant_shadow_sources.example.json`. A causal machine-specific detector
+then learns distinct quiet and production-like vibration regimes. It may infer only high-confidence,
+persistent `RUNNING`; uncalibrated, quiet, unstable, impulsive, extreme, or unfamiliar patterns stay
+`UNKNOWN` and keep RUL paused. Authoritative PLC/CMMS/operator evidence always wins. Vibration alone
+never claims `OFF`, `IDLE`, or `MAINTENANCE`, because those modes are not identifiable reliably from
+the five aggregate sensor fields.
+
+Install backend/API and frontend dependencies:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+Set-Location frontend
+npm install
+Set-Location ..
+```
+
+Verify the immutable runtime boundary before adding a source:
+
+```powershell
+.venv\Scripts\python.exe main.py plant-shadow verify-golden
+.venv\Scripts\python.exe -c "import sys; sys.path.insert(0,'src'); from vvb001_monitor.plant_shadow.manifest import verify_manifest; print(verify_manifest('.', 'output/plant_shadow/plant_shadow_runtime_manifest.json')['deployment_id'])"
+```
+
+Copy `config/plant_shadow_sources.example.json` to a local untracked configuration file. Keep the
+DSN itself in the named environment variable; do not put a password in JSON or SQLite:
+
+```powershell
+$env:VVB001_PLANT_SOURCE_A_DSN = "postgresql://readonly_user:password@host/database"
+
+.venv\Scripts\python.exe main.py plant-shadow source-save `
+    --sources config\plant_shadow_sources.local.json `
+    --actor "engineer-name"
+
+.venv\Scripts\python.exe main.py plant-shadow ingest `
+    --sources config\plant_shadow_sources.local.json `
+    --once
+```
+
+Remove `--once` only after the source passes read-only schema and durable-identity validation.
+The service verifies the manifest and golden replay before connecting, resumes from a composite
+timestamp/row watermark, and rebuilds a source runtime from committed evidence after a failed
+local transaction.
+
+For a large live database, no export or lifetime backfill is required. The default source
+configuration reads only the latest 24 source-hours on first connection, in bounded 1,000-row
+batches, then continues from the durable watermark. Every query has a 30-second statement timeout.
+The connector requires a PostgreSQL index beginning with `(timestamp, durable_row_id)`; it reports a
+clear error if the index is absent and never creates it with the SELECT-only account. See
+`LARGE_DATABASE_DIRECT_INGESTION.md`.
+
+GPU training is intentionally not part of this path. The accepted v2.7 Extra Trees artifact remains
+frozen, the unlabeled plant stream is not training data, and the operating detector uses bounded
+causal statistics. Database indexing and bounded streaming address the actual large-table
+bottleneck without adding a second model stack.
+
+Operating state may come from optional read-only PostgreSQL columns configured in
+`plant_shadow_sources.example.json`, or from a separate local PLC/CMMS/operator interval. For
+example, record a confirmed maintenance window without modifying the sensor table:
+
+```powershell
+.venv\Scripts\python.exe main.py plant-shadow operating-state-add `
+    --source-system CMMS `
+    --external-event-id WO-2026-0814-001 `
+    --machine-uid "plant-source-a::LINE_1::MACHINE_1" `
+    --operating-state MAINTENANCE `
+    --operating-state-source CMMS `
+    --confidence 1.0 `
+    --effective-from "2026-08-14T08:00:00+08:00" `
+    --effective-to "2026-08-14T12:00:00+08:00" `
+    --maintenance-event-id WO-2026-0814-001 `
+    --actor "engineer-name"
+```
+
+Overlapping local evidence with contradictory states resolves to `UNKNOWN` and withholds RUL.
+Confirmed component replacement closes the old lifecycle; the next confirmed-running row starts a
+clean lifecycle and operating clock. Inspection, idle time, shutdown, and unclassified maintenance
+do not silently reset spindle life.
+
+Independent endpoint evidence is entered locally. An exact timestamp needs equal lower and upper
+values. Classification applies target-specific truth/censoring policy; replacement does not
+automatically become CRITICAL truth:
+
+```powershell
+.venv\Scripts\python.exe main.py plant-shadow evidence-add `
+    --source-system CMMS `
+    --external-event-id EVENT-123 `
+    --machine-uid "plant-source-a::LINE_1::MACHINE_1" `
+    --lifecycle-id "lc_..." `
+    --precision EXACT_TIMESTAMP `
+    --time-lower "2026-08-13T10:00:00+08:00" `
+    --time-upper "2026-08-13T10:00:00+08:00" `
+    --actor "engineer-name"
+
+.venv\Scripts\python.exe main.py plant-shadow evidence-classify `
+    --evidence-id "evidence_..." `
+    --endpoint-class PREVENTIVE_MAINTENANCE `
+    --actor "engineer-name"
+
+.venv\Scripts\python.exe main.py plant-shadow evaluate
+```
+
+Start the read-only local dashboard services:
+
+```powershell
+.venv\Scripts\python.exe main.py plant-shadow serve-api --host 127.0.0.1
+Set-Location frontend
+npm run dev
+```
+
+The API refuses a non-loopback host in this release. Source and endpoint mutations are CLI-only.
+See `VVB001_PLANT_SHADOW_LIFECYCLE_FRONTEND_SPEC_V2.md`,
+`VIBRATION_OPERATING_INFERENCE_IMPLEMENTATION.md`, `PLANT_SHADOW_REPOSITORY_INSPECTION.md`, and
+`PLANT_SHADOW_IMPLEMENTATION_SUMMARY.md`.
+
+### Disposable PostgreSQL end-to-end verification
+
+Before any approved plant connection, run the isolated two-source native PostgreSQL scenario. The
+harness uses either a dedicated database on an existing loopback PostgreSQL server or a disposable
+native `initdb`/`pg_ctl` cluster on `127.0.0.1:55432`. It creates a separate SELECT-only application
+role and uses overlapping line/machine names across two schemas.
+
+Existing local server mode:
+
+```powershell
+$env:VVB001_E2E_ADMIN_DSN = "postgresql://fixture_admin:password@127.0.0.1:5432/postgres"
+.venv\Scripts\python.exe tests\e2e\run_plant_shadow_postgres_e2e.py
+Remove-Item Env:VVB001_E2E_ADMIN_DSN
+```
+
+The supplied admin must be limited to the local E2E server and capable of creating/dropping the
+strictly named `vvb001_e2e_*` fixture database and its dedicated reader role. The harness refuses
+remote hosts, broad database names, an existing target database, or an existing derived reader role.
+It drops only the database and role it created unless `--keep-database` is explicitly supplied.
+
+Disposable native-cluster mode requires installed PostgreSQL server binaries. They are detected from
+`PATH` and standard Windows PostgreSQL directories, or may be supplied explicitly:
+
+```powershell
+.venv\Scripts\python.exe tests\e2e\run_plant_shadow_postgres_e2e.py `
+    --pg-bin-dir "C:\Program Files\PostgreSQL\18\bin" `
+    --port 55432
+```
+
+Startup is non-blocking and bounded: `pg_ctl -W start` returns after handoff, `pg_isready` polls for
+at most 60 seconds, and all utility/database operations have finite timeouts. Stage messages are
+flushed to the console. The harness refuses an occupied port, records the temporary cluster PID and
+data directory, and stops only that owned cluster on success, failure, or interruption.
+
+The harness verifies real PostgreSQL schema/identity checks, composite polling, bounded late-row
+capture, duplicate idempotency, source-isolated frozen runtimes, restart rebuild, typed operating
+state, OFF/MAINTENANCE exclusion, pause/resume exposure time, feature-gap versus lifecycle semantics,
+independent WARNING/CRITICAL evidence, preventive-maintenance censoring,
+support-gated metrics, read-only API state, and source-level failure isolation. Fixture provisioning
+uses the fixture/admin connection; the application itself uses only the generated SELECT-only reader,
+whose attempted write must fail. No Docker, Testcontainers, or container dependency is used.
+
+To include this scenario in pytest explicitly:
+
+```powershell
+$env:VVB001_RUN_NATIVE_POSTGRES_E2E = "1"
+.venv\Scripts\python.exe -m pytest -q tests\test_plant_shadow_postgres_e2e.py
+Remove-Item Env:VVB001_RUN_NATIVE_POSTGRES_E2E
+```
+
+The report is written to `output/plant_shadow/postgres_e2e_report.json`. This is strictly a
+disposable local integration test and is not plant validation. The PostgreSQL 18 Windows run on
+port 55432 completed with `[E2E] PASS`; the owned PID terminated and the port was released.

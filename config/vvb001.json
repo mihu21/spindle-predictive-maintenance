@@ -1,0 +1,37 @@
+{
+  "postgres": {
+    "source_name": "vvb001_spindle",
+    "dsn_env": "VVB001_POSTGRES_DSN",
+    "schema": "public",
+    "table": "vvb001_readings",
+    "columns": {
+      "source_id": "id",
+      "timestamp": "timestamp",
+      "line_sel": "line_sel",
+      "machine_id": "machine_id",
+      "vrms": "vrms",
+      "arms": "arms",
+      "apeak": "apeak",
+      "crest": "crest",
+      "temp": "temp"
+    },
+    "poll_seconds": 5.0,
+    "batch_size": 1000
+  },
+  "sensor": {
+    "acceleration_unit": "m_s2",
+    "history_hours": 24.0,
+    "feature_windows_minutes": [
+      15,
+      60,
+      360,
+      1440
+    ],
+    "ewma_alpha": 0.1,
+    "crest_consistency_relative_tolerance": 0.25,
+    "crest_consistency_min_arms": 1e-09,
+    "baseline_hours": 3.0,
+    "baseline_min_points": 10,
+    "baseline_std_floor_fraction": 0.03
+  }
+}

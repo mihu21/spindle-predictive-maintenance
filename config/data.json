@@ -1,8 +1,0 @@
-{
-  "feature_windows_minutes": [5, 15, 30, 60, 180, 360, 720, 1440],
-  "target_sampling_interval_seconds": 60,
-  "interpolation_enabled": false,
-  "maximum_interpolation_gap_minutes": 5,
-  "large_gap_policy": "mark_unavailable",
-  "duration_bucket_boundaries_hours": [72, 168, 336, 720]
-}
