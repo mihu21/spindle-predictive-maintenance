@@ -1,0 +1,255 @@
+{
+  "freeze_version": "rul_v2_7_preacceptance_freeze_v1",
+  "created_at": "2026-08-13T03:01:06.122763+00:00",
+  "model_path": "C:\\Users\\MiHu\\Documents\\magang\\ml\\spindle_prognostics_vvb001\\models\\rul_v2_7_full_cadence.joblib",
+  "model_sha256": "ecad8f4f704129a3f0456c3c8dd47aabeb94ea6dfbdfd4c264313aea46076b9a",
+  "frozen_v2_6_model_sha256": "e46f426fbb87c5f6a9ea827774b2d1531b809734d2b987b2aef2b6d52cc37aa7",
+  "frozen_point_contract_hashes": {
+    "feature_names_hash": "2629d4e6203c308d406af3f9bfd8fc6d82d993b22c40fd3614b920cd033d73d7",
+    "base_feature_names_hash": "8a642039f6eba64d0467836aa0109bff70b906a4182c2fd36cf1a0536ed25895",
+    "stabilization_hash": "2e34167ac422de9968ceb74b492365c1d93a88f9d28b88d53c5232f109c7f464",
+    "warning": {
+      "estimator_contract": {
+        "configuration_hash": "e50fc5f16cc91e91a94abfa346eb9fe30c7825242435298fbfe6a584431dd6b3",
+        "probe_prediction_hash": "365d2c099779dd553bc8705489ddf127e2570cca2cfe9e66f5104808c31a1d0b",
+        "probe_rows": 257,
+        "probe_prediction_summary": {
+          "min": 21.235777989418306,
+          "median": 59.61465025085562,
+          "max": 93.59919585735851
+        }
+      }
+    },
+    "critical": {
+      "estimator_contract": {
+        "configuration_hash": "bd3221d522535181d3ab30794dea36cb648f178f666ce20f4f3ba6c97803286e",
+        "probe_prediction_hash": "89a38fb8dc485b5475b6e71280d1fac3b14abc3739cf19b927fa68191c4de13a",
+        "probe_rows": 257,
+        "probe_prediction_summary": {
+          "min": 33.39628907365248,
+          "median": 78.57283651484988,
+          "max": 124.13122546905862
+        }
+      }
+    }
+  },
+  "frozen_selector_contract_hashes": {
+    "warning": "c1fa4adc8e951bdfc450a2f2d9cfee52",
+    "critical": "39ce7e13e08b9a8c4a021fa17b818963"
+  },
+  "manifest_sha256": "b01c9bc94eb0335a571246172235919620568484d65cac9663c5eeaa95765146",
+  "fit_sha256": "675d0aeaa85939658d7dff6962abe4d8fe0cafa78d88c7fc907a69b70bcad78c",
+  "calibration_sha256": "5cb9cde85a38f3c9e24e4d917687b9ce96d1375bef2601abc47c9500b2dc5e71",
+  "acceptance_status": "PREDECLARED_NOT_GENERATED",
+  "parity_report": {
+    "version": "supervised_quantile_rul_v2_7_identity_first_critical",
+    "rows": 21749,
+    "tolerance": 1e-09,
+    "exact_fields": [
+      "id",
+      "lifecycle_id",
+      "batch_id",
+      "warning_rul_forecastability_state",
+      "warning_rul_serviceable_intent",
+      "warning_rul_withholding_reason_code",
+      "warning_rul_calibration_stratum",
+      "critical_rul_forecastability_state",
+      "critical_rul_serviceable_intent",
+      "critical_rul_withholding_reason_code",
+      "critical_rul_calibration_stratum"
+    ],
+    "float_fields": [
+      "warning_rul_forecastability_score",
+      "warning_rul_raw_point_hours",
+      "warning_rul_corrected_point_hours",
+      "estimated_hours_to_warning",
+      "warning_lower_hours",
+      "warning_upper_hours",
+      "critical_rul_forecastability_score",
+      "critical_rul_raw_point_hours",
+      "critical_rul_corrected_point_hours",
+      "estimated_hours_to_critical",
+      "critical_lower_hours",
+      "critical_upper_hours"
+    ],
+    "derived_exact_fields": [
+      "warning_covered",
+      "critical_covered"
+    ],
+    "mismatch_count": 0,
+    "first_mismatches": [],
+    "passed": true,
+    "first_predictions_sha256": "c6c24ee61cf0e67d8193ac301b0213f4131e21968ea03f1b07044720e28f5018",
+    "reloaded_predictions_sha256": "009dacc2c69dd471036a5436ca4b2a1ff8dbb8cdd9c177f1095dd589e6202217"
+  },
+  "preacceptance_metrics": {
+    "warning": {
+      "contract_maximum_horizon_hours": 24.0,
+      "total_positive_forecast_rows": 15388,
+      "outside_contract_horizon_rows": 12088,
+      "eligible_rows": 3300,
+      "observed_target_override_rows": 1326,
+      "serviceable_intent_rows": 2234,
+      "emitted_rows": 2234,
+      "active_row_fraction": 0.676969696969697,
+      "active_lifecycle_fraction": 0.967741935483871,
+      "active_batch_fraction": 1.0,
+      "active_region_availability": 1.0,
+      "mae_hours": 3.1272415470373303,
+      "mean_signed_error_hours": -0.48303081653699875,
+      "interval_coverage": 0.9588182632050134,
+      "macro_lifecycle_coverage": 0.9589923874405807,
+      "mean_interval_width_hours": 17.814092939464302,
+      "p90_interval_width_hours": 18.160015243317552,
+      "horizon_bias": {
+        "le_6h": {
+          "rows": 333,
+          "lifecycles": 18,
+          "batches": 4,
+          "bias_hours": 1.8767800254417455
+        },
+        "6_12h": {
+          "rows": 737,
+          "lifecycles": 25,
+          "batches": 4,
+          "bias_hours": 1.3541035045266478
+        },
+        "12_24h": {
+          "rows": 1164,
+          "lifecycles": 28,
+          "batches": 4,
+          "bias_hours": -2.3213340854397733
+        },
+        "24_48h": {
+          "rows": 0,
+          "lifecycles": 0,
+          "batches": 0,
+          "bias_hours": null
+        }
+      },
+      "active_monotonicity": 0.9936479128856625,
+      "active_monotonic_pairs": 2204
+    },
+    "critical": {
+      "contract_maximum_horizon_hours": 48.0,
+      "total_positive_forecast_rows": 19200,
+      "outside_contract_horizon_rows": 11552,
+      "eligible_rows": 7648,
+      "observed_target_override_rows": 1518,
+      "serviceable_intent_rows": 4624,
+      "emitted_rows": 4624,
+      "active_row_fraction": 0.604602510460251,
+      "active_lifecycle_fraction": 0.96875,
+      "active_batch_fraction": 1.0,
+      "active_region_availability": 1.0,
+      "mae_hours": 3.852192461075049,
+      "mean_signed_error_hours": -0.5576314695397702,
+      "interval_coverage": 0.941825259515571,
+      "macro_lifecycle_coverage": 0.9289699215404761,
+      "mean_interval_width_hours": 21.389861591011247,
+      "p90_interval_width_hours": 21.885877914642045,
+      "horizon_bias": {
+        "le_6h": {
+          "rows": 373,
+          "lifecycles": 13,
+          "batches": 4,
+          "bias_hours": 1.0839321866017142
+        },
+        "6_12h": {
+          "rows": 512,
+          "lifecycles": 16,
+          "batches": 4,
+          "bias_hours": 1.1873078702102697
+        },
+        "12_24h": {
+          "rows": 1599,
+          "lifecycles": 28,
+          "batches": 4,
+          "bias_hours": 1.1622263678514833
+        },
+        "24_48h": {
+          "rows": 2140,
+          "lifecycles": 30,
+          "batches": 4,
+          "bias_hours": -2.5463066413535125
+        }
+      },
+      "active_monotonicity": 0.9830176355323318,
+      "active_monotonic_pairs": 4593
+    }
+  },
+  "preacceptance_checks": {
+    "warning_correction_selection": true,
+    "warning_mae": true,
+    "warning_availability": true,
+    "warning_coverage": true,
+    "warning_macro_coverage": true,
+    "warning_width": true,
+    "warning_row_breadth": true,
+    "warning_lifecycle_breadth": true,
+    "warning_batch_breadth": true,
+    "warning_active_monotonicity": true,
+    "warning_le_6h_support": true,
+    "warning_le_6h_bias": true,
+    "warning_6_12h_support": true,
+    "warning_6_12h_bias": true,
+    "warning_12_24h_support": true,
+    "warning_12_24h_bias": true,
+    "critical_correction_selection": true,
+    "critical_mae": true,
+    "critical_availability": true,
+    "critical_coverage": true,
+    "critical_macro_coverage": true,
+    "critical_width": true,
+    "critical_row_breadth": true,
+    "critical_lifecycle_breadth": true,
+    "critical_batch_breadth": true,
+    "critical_active_monotonicity": true,
+    "critical_le_6h_support": true,
+    "critical_le_6h_bias": true,
+    "critical_6_12h_support": true,
+    "critical_6_12h_bias": true,
+    "critical_12_24h_support": true,
+    "critical_12_24h_bias": true,
+    "critical_24_48h_support": true,
+    "critical_24_48h_bias": true
+  },
+  "acceptance_generation_authorized": true,
+  "target_contract_hash": "0d6f3fe4e55760d48458aa70582d8bc773ff6293fc6756d500d8858886f3e5fb",
+  "criteria": {
+    "max_critical_mae_hours": 7.0,
+    "max_warning_mae_hours": 7.0,
+    "min_interval_coverage": 0.8,
+    "min_macro_lifecycle_coverage": 0.75,
+    "min_active_region_availability": 0.95,
+    "max_absolute_horizon_bias_hours": 6.0,
+    "max_parity_float_difference": 1e-09,
+    "max_artifact_bytes": 262144000,
+    "max_runtime_p95_ms_per_row": 100.0,
+    "max_runtime_p99_ms_per_row": 250.0,
+    "max_incremental_memory_mb": 500.0,
+    "max_warning_mean_interval_width_hours": 24.0,
+    "max_critical_mean_interval_width_hours": 42.0,
+    "minimum_active_row_fraction": 0.2,
+    "minimum_active_lifecycle_fraction": 0.75,
+    "minimum_active_batch_fraction": 1.0,
+    "minimum_lifecycles_per_horizon": 8,
+    "minimum_batches_per_horizon": 4,
+    "min_active_monotonicity": 0.95,
+    "max_candidate_horizon_mae_increase_hours": 0.5,
+    "maximum_correction_hours": 3.0,
+    "maximum_correction_slope": 0.25
+  },
+  "acceptance_content_parsed_before_freeze": false,
+  "runtime_code_sha256": {
+    "rul_v2_7.py": "74c5b580eccb98c57e2e413dcfffe227eb4178230ced98b1a2435dcd4c57bd33",
+    "rul_v2_6.py": "39f419394421b6ac6e956cbad24c27d72a987120ce7ea688096a8c8c219ad34a",
+    "rul_ml.py": "1b3bccdb1c9ccd99153be8ccdf1e0d251a0c0542bdcadf5b7909085cfa32dd06",
+    "rul_features_v2_4.py": "bee66ccae09b24d4e38448de1ebc4b3d60fc338c2a669390cbfdd4c3aa86d585",
+    "rul_evaluation.py": "d4af01372717364188a42717a547f80cffcf4f8f6fa70a0600ebddd8cdbc3250",
+    "monitor.py": "43b883c787813842a5bab3cb17374b1ed893cb57a6b55870c309742a9d23a58f"
+  },
+  "manifest_sha256_after_acceptance_generation": "1302887f638469b52325f1653d367d7e761efc7d92f7ed466ded03bf34aefa80",
+  "acceptance_sha256": "d4a6d32e81475e6aa9a044af017ea978476f4e44af9d3c387e2461199aed832d",
+  "acceptance_generated_after_parity": true
+}

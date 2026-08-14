@@ -9,15 +9,3 @@ frontend/node_modules/
 frontend/dist/
 data/*
 !data/.gitkeep
-!data/stress/
-!data/stress/stress_v1/
-!data/stress/stress_v1/*.csv
-!data/stress/stress_v1/*.json
-output/*
-!output/.gitkeep
-!output/plant_shadow/
-output/plant_shadow/*
-!output/plant_shadow/plant_shadow_runtime_manifest.json
-!output/plant_shadow/postgres_e2e_report.json
-models/*
-!models/.gitkeep

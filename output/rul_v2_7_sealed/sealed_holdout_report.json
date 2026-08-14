@@ -1,0 +1,195 @@
+{
+  "version": "supervised_quantile_rul_v2_7_identity_first_critical",
+  "protocol_version": "rul_v2_7_one_time_sealed_holdout_v1",
+  "evidence_domain": "realistic_synthetic",
+  "model_sha256": "ecad8f4f704129a3f0456c3c8dd47aabeb94ea6dfbdfd4c264313aea46076b9a",
+  "criteria": {
+    "max_critical_mae_hours": 7.0,
+    "max_warning_mae_hours": 7.0,
+    "min_interval_coverage": 0.8,
+    "min_macro_lifecycle_coverage": 0.75,
+    "min_active_region_availability": 0.95,
+    "max_absolute_horizon_bias_hours": 6.0,
+    "max_parity_float_difference": 1e-09,
+    "max_artifact_bytes": 262144000,
+    "max_runtime_p95_ms_per_row": 100.0,
+    "max_runtime_p99_ms_per_row": 250.0,
+    "max_incremental_memory_mb": 500.0,
+    "max_warning_mean_interval_width_hours": 24.0,
+    "max_critical_mean_interval_width_hours": 42.0,
+    "minimum_active_row_fraction": 0.2,
+    "minimum_active_lifecycle_fraction": 0.75,
+    "minimum_active_batch_fraction": 1.0,
+    "minimum_lifecycles_per_horizon": 8,
+    "minimum_batches_per_horizon": 4,
+    "min_active_monotonicity": 0.95,
+    "max_candidate_horizon_mae_increase_hours": 0.5,
+    "maximum_correction_hours": 3.0,
+    "maximum_correction_slope": 0.25
+  },
+  "target_metrics": {
+    "warning": {
+      "contract_maximum_horizon_hours": 24.0,
+      "total_positive_forecast_rows": 28534,
+      "outside_contract_horizon_rows": 22180,
+      "eligible_rows": 6354,
+      "observed_target_override_rows": 2908,
+      "serviceable_intent_rows": 4327,
+      "emitted_rows": 4327,
+      "active_row_fraction": 0.6809883537928864,
+      "active_lifecycle_fraction": 1.0,
+      "active_batch_fraction": 1.0,
+      "active_region_availability": 1.0,
+      "mae_hours": 2.756098295998909,
+      "mean_signed_error_hours": -0.3989687166097837,
+      "interval_coverage": 0.9683383406517218,
+      "macro_lifecycle_coverage": 0.9516805821386384,
+      "mean_interval_width_hours": 17.699031941848048,
+      "p90_interval_width_hours": 18.160015243317552,
+      "horizon_bias": {
+        "le_6h": {
+          "rows": 728,
+          "lifecycles": 34,
+          "batches": 8,
+          "bias_hours": 1.07635374080644
+        },
+        "6_12h": {
+          "rows": 1366,
+          "lifecycles": 49,
+          "batches": 8,
+          "bias_hours": 0.7552808103799863
+        },
+        "12_24h": {
+          "rows": 2233,
+          "lifecycles": 56,
+          "batches": 8,
+          "bias_hours": -1.5860442217002615
+        },
+        "24_48h": {
+          "rows": 0,
+          "lifecycles": 0,
+          "batches": 0,
+          "bias_hours": null
+        }
+      },
+      "active_monotonicity": 0.9910902696365768,
+      "active_monotonic_pairs": 4265
+    },
+    "critical": {
+      "contract_maximum_horizon_hours": 48.0,
+      "total_positive_forecast_rows": 35946,
+      "outside_contract_horizon_rows": 21083,
+      "eligible_rows": 14863,
+      "observed_target_override_rows": 3566,
+      "serviceable_intent_rows": 9209,
+      "emitted_rows": 9209,
+      "active_row_fraction": 0.6195922761219135,
+      "active_lifecycle_fraction": 1.0,
+      "active_batch_fraction": 1.0,
+      "active_region_availability": 1.0,
+      "mae_hours": 3.5819728112028426,
+      "mean_signed_error_hours": -0.6936302690150659,
+      "interval_coverage": 0.9511347594744272,
+      "macro_lifecycle_coverage": 0.9323727238498479,
+      "mean_interval_width_hours": 21.256125294546273,
+      "p90_interval_width_hours": 21.885877914642045,
+      "horizon_bias": {
+        "le_6h": {
+          "rows": 848,
+          "lifecycles": 31,
+          "batches": 8,
+          "bias_hours": 0.5213159008231917
+        },
+        "6_12h": {
+          "rows": 1247,
+          "lifecycles": 40,
+          "batches": 8,
+          "bias_hours": 0.9816846320200661
+        },
+        "12_24h": {
+          "rows": 3201,
+          "lifecycles": 55,
+          "batches": 8,
+          "bias_hours": 0.7514034181702642
+        },
+        "24_48h": {
+          "rows": 3913,
+          "lifecycles": 54,
+          "batches": 8,
+          "bias_hours": -2.6729159491310623
+        }
+      },
+      "active_monotonicity": 0.9885195713973322,
+      "active_monotonic_pairs": 9146
+    }
+  },
+  "checks": {
+    "warning_correction_selection": true,
+    "warning_mae": true,
+    "warning_availability": true,
+    "warning_coverage": true,
+    "warning_macro_coverage": true,
+    "warning_width": true,
+    "warning_row_breadth": true,
+    "warning_lifecycle_breadth": true,
+    "warning_batch_breadth": true,
+    "warning_active_monotonicity": true,
+    "warning_le_6h_support": true,
+    "warning_le_6h_bias": true,
+    "warning_6_12h_support": true,
+    "warning_6_12h_bias": true,
+    "warning_12_24h_support": true,
+    "warning_12_24h_bias": true,
+    "critical_correction_selection": true,
+    "critical_mae": true,
+    "critical_availability": true,
+    "critical_coverage": true,
+    "critical_macro_coverage": true,
+    "critical_width": true,
+    "critical_row_breadth": true,
+    "critical_lifecycle_breadth": true,
+    "critical_batch_breadth": true,
+    "critical_active_monotonicity": true,
+    "critical_le_6h_support": true,
+    "critical_le_6h_bias": true,
+    "critical_6_12h_support": true,
+    "critical_6_12h_bias": true,
+    "critical_12_24h_support": true,
+    "critical_12_24h_bias": true,
+    "critical_24_48h_support": true,
+    "critical_24_48h_bias": true,
+    "runtime_p95": true,
+    "runtime_p99": true,
+    "incremental_memory": true,
+    "artifact_size": true
+  },
+  "target_result": {
+    "warning": true,
+    "critical": true
+  },
+  "all_required_gates_passed": true,
+  "synthetic_development_validation_complete": true,
+  "synthetic_candidate_locked": true,
+  "sealed_holdout_generated_or_evaluated": true,
+  "sealed_holdout_consumed": true,
+  "plant_production_authorized": false,
+  "plant_validation_status": "NOT_STARTED",
+  "runtime_performance": {
+    "warmup_rows_excluded": 100,
+    "measured_rows": 41139,
+    "p95_ms_per_row": 68.1005099990216,
+    "p99_ms_per_row": 73.81225400004041,
+    "rss_before_bytes": 133177344,
+    "rss_after_bytes": 184307712,
+    "incremental_memory_mb": 48.76171875,
+    "artifact_bytes": 79846167,
+    "environment": {
+      "platform": "Windows-11-10.0.26200-SP0",
+      "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+      "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+      "numpy": "2.5.2",
+      "rss_bytes": 346038272
+    }
+  },
+  "post_sealed_analysis_role": "hypothesis_only_no_reselection_no_retuning"
+}
