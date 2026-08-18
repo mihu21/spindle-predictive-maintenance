@@ -4,26 +4,31 @@ This transfer kit is for read-only plant-shadow testing against the office Postg
 
 ## 1. Prepare the office computer
 
-Install Python 3.14, then open PowerShell in the extracted kit directory:
+Install 64-bit Python 3.14 and a current Node.js LTS release. Then open PowerShell in the extracted
+kit directory and run the automated setup:
 
 ```powershell
-py -3.14 -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe -m pip check
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup_office_laptop.ps1
 ```
 
-The frontend production build is already present in `frontend/dist`. To rerun frontend tests or rebuild it, install a current Node.js LTS release and run:
+The setup script creates `.venv`, installs the Python dependencies using the validated
+`requirements-office-lock.txt` constraints, installs the exact frontend dependency lock with
+`npm ci`, tests and builds the dashboard, creates the ignored local source
+template, and runs offline plant-shadow verification. It does not connect to PostgreSQL and does not
+store credentials.
+
+For a backend-only setup, use `-SkipFrontend`. The normal dashboard launcher requires the frontend
+setup to have completed.
+
+You can rerun the offline readiness checks at any time:
 
 ```powershell
-Set-Location frontend
-npm ci
-npm test
-npm run build
-Set-Location ..
+.\test_office_readiness.ps1
 ```
 
-`npm run build` runs the TypeScript project check before producing the Vite bundle.
+Use `-Full` to run all Python tests. Test scratch data is deliberately placed inside the project,
+which avoids failures on office laptops whose system temp folder is restricted.
 
 ## 2. Verify the frozen runtime before connecting
 
@@ -38,6 +43,9 @@ The final command must print:
 ```text
 ecad8f4f704129a3f0456c3c8dd47aabeb94ea6dfbdfd4c264313aea46076b9a
 ```
+
+These checks are already included in both setup and `test_office_readiness.ps1`; the individual
+commands remain documented for manual auditing.
 
 ## 3. Obtain a SELECT-only database account
 
@@ -77,6 +85,16 @@ For a very large table, retain the safe defaults unless there is a measured reas
 
 ## 5. Run a bounded first connection
 
+The safest automated first connection performs the same redacted source save, exactly one bounded
+ingestion cycle, and a local status read:
+
+```powershell
+.\test_office_readiness.ps1 -IncludeDatabase -Actor "your-name"
+```
+
+It refuses to connect if a configured `dsn_env` variable is missing and never prints the secret.
+Alternatively, run the equivalent commands individually:
+
 ```powershell
 .venv\Scripts\python.exe main.py plant-shadow source-save `
     --sources config\plant_shadow_sources.local.json `
@@ -93,12 +111,28 @@ The first run reads only the latest configured source-relative lookback, then ad
 
 If the bounded run succeeds, repeat it and verify that the durable watermark resumes without duplicates. Only then consider continuous shadow ingestion by removing `--once`.
 
-## 6. Database-focused verification
-
-Run the connector, storage, lifecycle, operating-state, API, manifest, and golden-replay tests:
+Start the localhost-only API and dashboard after the bounded check:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -q `
+.\run_plant_shadow.ps1 -Actor "your-name"
+```
+
+The launcher intentionally does not start ingestion. Keep using explicit `--once` cycles until the
+machine-state evidence, machine isolation, watermark, and local audit records have been inspected.
+
+## 6. Database-focused verification
+
+The default readiness script runs the connector, storage, lifecycle, operating-state, API,
+manifest, and golden-replay tests:
+
+```powershell
+.\test_office_readiness.ps1
+```
+
+The equivalent direct pytest command is:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_tmp_office_readiness `
     tests\test_config.py `
     tests\test_readonly_contract.py `
     tests\test_plant_shadow_contracts.py `

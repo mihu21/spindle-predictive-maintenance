@@ -11,6 +11,7 @@ Set-Location $ProjectRoot
 
 $Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $FrontendDir = Join-Path $ProjectRoot "frontend"
+$FrontendModules = Join-Path $FrontendDir "node_modules"
 $LocalConfig = Join-Path $ProjectRoot "config\plant_shadow_sources.local.json"
 $ExampleConfig = Join-Path $ProjectRoot "config\plant_shadow_sources.example.json"
 $EvidenceDb = Join-Path $ProjectRoot "output\plant_shadow\plant_shadow.db"
@@ -35,8 +36,14 @@ if (-not (Test-Path $FrontendDir)) {
     Fail "Frontend directory not found at: $FrontendDir"
 }
 
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Fail "npm is not available in PATH. Install Node.js/npm first."
+$Npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+if ($null -eq $Npm) {
+    Fail "npm is not available in PATH. Run setup_office_laptop.ps1 after installing Node.js LTS."
+}
+$NpmPath = $Npm.Source
+
+if (-not (Test-Path $FrontendModules)) {
+    Fail "Frontend dependencies are missing. Run setup_office_laptop.ps1 first."
 }
 
 # --- Ensure local source config exists ---
@@ -108,7 +115,7 @@ Write-Host "[4/4] Starting frontend on http://127.0.0.1:5173 ..." -ForegroundCol
 $FrontendCommand = @"
 Set-Location '$FrontendDir'
 Write-Host 'VVB001 Plant Shadow Frontend' -ForegroundColor Cyan
-npm run dev
+& '$NpmPath' run dev
 "@
 
 Start-Process powershell.exe -ArgumentList @(

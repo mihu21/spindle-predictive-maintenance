@@ -639,11 +639,14 @@ the five aggregate sensor fields.
 Install backend/API and frontend dependencies:
 
 ```powershell
-.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-Set-Location frontend
-npm install
-Set-Location ..
+.\setup_office_laptop.ps1
 ```
+
+On Windows this creates the Python 3.14 virtual environment, uses the validated Python constraints
+in `requirements-office-lock.txt`, installs locked frontend dependencies, tests/builds the dashboard,
+and runs the offline office plant-shadow checks. See
+`OFFICE_DATABASE_TESTING_QUICKSTART.md` for the bounded live-database workflow. The test script uses
+project-local pytest scratch space for compatibility with restricted corporate temp directories.
 
 Verify the immutable runtime boundary before adding a source:
 
@@ -735,7 +738,7 @@ Start the read-only local dashboard services:
 ```powershell
 .venv\Scripts\python.exe main.py plant-shadow serve-api --host 127.0.0.1
 Set-Location frontend
-npm run dev
+npm.cmd run dev
 ```
 
 The API refuses a non-loopback host in this release. Source and endpoint mutations are CLI-only.
