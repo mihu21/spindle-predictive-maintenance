@@ -15,3 +15,17 @@ main { padding: 36px clamp(24px, 4vw, 64px) 64px; overflow: hidden; }.page-head 
 .badge { display: inline-flex; border: 1px solid #3b514b; border-radius: 999px; padding: 5px 9px; font: 600 9px/1 Consolas, monospace; letter-spacing: .04em; color: #a8bbb5; }.badge.normal,.badge.available,.badge.supported,.badge.online,.badge.read-only,.badge.running,.badge.running-confirmed { border-color: #2a8c6c; color: #71e6bd; }.badge.warning,.badge.withheld,.badge.insufficient-evidence,.badge.initializing,.badge.idle,.badge.off,.badge.maintenance,.badge.unknown,.badge.paused,.badge.calibrating,.badge.production-pending,.badge.quiet-not-running,.badge.unknown-novel,.badge.unknown-impulsive { border-color: #8c742a; color: #f1ca61; }.badge.critical,.badge.error,.badge.production-not-authorized { border-color: #924e48; color: #ff9188; }.badge-stack { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .notice { padding: 24px; border: 1px solid #29423c; border-radius: 11px; color: #92a69f; }.notice.error { border-color: #924e48; color: #ff9188; }.card-grid,.target-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap: 16px; }.target { min-height: 330px; }.empty { color: #789088; max-width: 44ch; margin-top: 30px; }.json, pre { white-space: pre-wrap; overflow-wrap: anywhere; color: #b8cec6; font: 12px/1.7 Consolas, monospace; } dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } dt { color: #718a82; } dd { margin: 0; text-align: right; }
 @media (max-width: 760px) { .shell { grid-template-columns: 1fr; } aside { position: static; height: auto; } nav { grid-template-columns: repeat(2,1fr); margin-top: 20px; }.side-foot { margin-top: 22px; } main { padding: 24px 14px 48px; }.metrics.compact { grid-template-columns: 1fr; }.page-head { flex-direction: column; } }
+.demo-banner {
+  align-items: center;
+  background: #fff4cf;
+  border: 1px solid #e1b94f;
+  border-radius: 10px;
+  color: #503b00;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+}
+
+.demo-banner strong { letter-spacing: 0.06em; }

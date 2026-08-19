@@ -417,6 +417,31 @@ class EvidenceStore:
                 recorded_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS demo_runs (
+                run_id TEXT PRIMARY KEY,
+                environment_mode TEXT NOT NULL CHECK(environment_mode='DEMO'),
+                seed INTEGER NOT NULL,
+                requested_machines INTEGER NOT NULL,
+                hours REAL NOT NULL,
+                cadence_minutes INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                generator_version TEXT NOT NULL,
+                generated_at TEXT NOT NULL,
+                model_artifact_sha256 TEXT NOT NULL,
+                plant_production_authorized INTEGER NOT NULL CHECK(plant_production_authorized=0),
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS demo_machine_scenarios (
+                run_id TEXT NOT NULL REFERENCES demo_runs(run_id),
+                machine_uid TEXT NOT NULL,
+                machine_id TEXT NOT NULL,
+                scenario_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                metadata_json TEXT NOT NULL,
+                PRIMARY KEY(run_id,machine_uid,scenario_name)
+            );
+
             -- A v1 ledger did not record machine operating context. Preserve every historical raw
             -- row, but never infer that it was RUNNING during upgrade. The deterministic IDs make
             -- this migration idempotent, and the runtime will replay these rows as paused evidence.
@@ -467,6 +492,8 @@ class EvidenceStore:
             "target_censoring",
             "plant_evaluation_locks",
             "audit_log",
+            "demo_runs",
+            "demo_machine_scenarios",
         )
         for table in immutable:
             for operation in ("UPDATE", "DELETE"):
@@ -578,6 +605,42 @@ class EvidenceStore:
             (health_event_id, source_key, connection_state, latest_source_timestamp, query_latency_ms, malformed_rows, duplicate_rows, late_rows, error_code, message, utc_now().isoformat()),
         )
         return health_event_id
+
+    def record_demo_run(self, payload: dict[str, Any]) -> None:
+        """Persist deterministic, non-model metadata for an isolated local demo run."""
+        self.db.execute(
+            "INSERT INTO demo_runs VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                str(payload["run_id"]),
+                "DEMO",
+                int(payload["seed"]),
+                int(payload["requested_machines"]),
+                float(payload["hours"]),
+                int(payload["cadence_minutes"]),
+                str(payload["start_time"]),
+                str(payload["generator_version"]),
+                str(payload["generated_at"]),
+                str(payload["model_artifact_sha256"]),
+                0,
+                _json(payload.get("metadata") or {}),
+            ),
+        )
+
+    def record_demo_machine_scenario(
+        self,
+        *,
+        run_id: str,
+        machine_uid: str,
+        machine_id: str,
+        scenario_name: str,
+        description: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Attach audit-only scenario labels without exposing them to model features."""
+        self.db.execute(
+            "INSERT INTO demo_machine_scenarios VALUES(?,?,?,?,?,?)",
+            (run_id, machine_uid, machine_id, scenario_name, description, _json(metadata or {})),
+        )
 
     def add_operating_state_evidence(
         self,

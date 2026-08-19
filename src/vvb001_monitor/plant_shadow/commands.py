@@ -9,6 +9,7 @@ from typing import Any
 
 from ..config import AppConfig
 from .contracts import EndpointClass, EndpointPrecision, OperatingState, OperatingStateSource
+from .demo import DEFAULT_DEMO_DATABASE, DEFAULT_START_TIME, DemoConfig, generate_demo_database
 from .evaluation import evaluate_plant
 from .golden import verify_golden_replay
 from .manifest import verify_manifest, write_manifest
@@ -57,6 +58,20 @@ def add_plant_shadow_parser(subparsers) -> None:
 
     status = actions.add_parser("status", help="Print local plant-shadow evidence status")
     status.add_argument("--database", default=DEFAULT_DATABASE)
+
+    demo = actions.add_parser(
+        "generate-demo",
+        help="Rebuild an isolated deterministic local demo through the frozen plant-shadow runtime",
+    )
+    demo.add_argument("--database", default=DEFAULT_DEMO_DATABASE)
+    demo.add_argument("--machines", type=int, default=8)
+    demo.add_argument("--hours", type=float, default=72.0)
+    demo.add_argument("--seed", type=int, default=42)
+    demo.add_argument("--start-time", default=DEFAULT_START_TIME.isoformat())
+    demo.add_argument("--cadence-minutes", type=int, default=10)
+    demo.add_argument("--actor", default="local-demo-generator")
+    demo.add_argument("--config", default="config/vvb001.json")
+    demo.add_argument("--model", default=DEFAULT_MODEL)
 
     operating = actions.add_parser(
         "operating-state-add",
@@ -216,6 +231,24 @@ def run_plant_shadow_command(args: argparse.Namespace) -> None:
     elif action == "status":
         with EvidenceStore(args.database) as store:
             print(json.dumps(store.overview(), indent=2, sort_keys=True))
+    elif action == "generate-demo":
+        start_time = _parse_time(args.start_time)
+        if start_time is None:
+            raise ValueError("start-time is required")
+        result = generate_demo_database(
+            args.database,
+            config=DemoConfig(
+                machines=args.machines,
+                hours=args.hours,
+                seed=args.seed,
+                start_time=start_time,
+                cadence_minutes=args.cadence_minutes,
+                actor=args.actor,
+            ),
+            app_config_path=args.config,
+            model_path=args.model,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
     elif action == "operating-state-add":
         effective_from = _parse_time(args.effective_from)
         if effective_from is None:

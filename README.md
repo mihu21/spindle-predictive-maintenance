@@ -1,5 +1,13 @@
 # Spindle Prognostics — IFM VVB001
 
+For a deterministic, PostgreSQL-free end-to-end plant-shadow simulation using the real frozen v2.7 runtime, isolated SQLite evidence, FastAPI, and the existing React UI, see [LOCAL_DEMO_QUICKSTART.md](LOCAL_DEMO_QUICKSTART.md) or run:
+
+```powershell
+.\run_local_demo.ps1 -Actor "Michael"
+```
+
+The local demo is explicitly synthetic, leaves production authorization disabled, and never modifies the normal plant-shadow database.
+
 A VVB001-native spindle condition-monitoring project for learning degradation patterns from `vrms`, `arms`, `apeak`, `crest`, and temperature. It uses synthetic lifecycles first to bootstrap and test the learning pipeline, then can run the same feature/model pipeline on the real VVB001 PostgreSQL data.
 
 Expected PostgreSQL columns:

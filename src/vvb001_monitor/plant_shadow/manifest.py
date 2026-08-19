@@ -40,6 +40,8 @@ DEFAULT_RUNTIME_MODULES = (
     "src/vvb001_monitor/plant_shadow/runtime.py",
     "src/vvb001_monitor/plant_shadow/service.py",
     "src/vvb001_monitor/plant_shadow/golden.py",
+    "src/vvb001_monitor/plant_shadow/demo.py",
+    "src/vvb001_monitor/plant_shadow/api.py",
     "src/vvb001_monitor/plant_shadow/commands.py",
 )
 

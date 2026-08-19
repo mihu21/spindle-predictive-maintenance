@@ -11,6 +11,9 @@ export type Overview = {
   machines_vibration_inferred_running: number;
   active_alerts: number;
   validation_domain: string;
+  environment_mode: "DEMO" | "PLANT_SHADOW";
+  evidence_description: string;
+  demo_run?: Record<string, unknown> | null;
   plant_production_authorized: boolean;
 };
 
@@ -33,6 +36,8 @@ export type Machine = {
   vibration_classification?: string | null;
   vibration_calibration_state?: string | null;
   vibration_confidence?: number | null;
+  forecast_reason?: string | null;
+  demo_scenarios?: string | null;
 };
 
 export type VibrationOperatingInference = {

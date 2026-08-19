@@ -39,6 +39,32 @@ def _decode_rows(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
     return result
 
 
+def _table_exists(db: sqlite3.Connection, table: str) -> bool:
+    return db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone() is not None
+
+
+def _environment_payload(db: sqlite3.Connection) -> dict[str, Any]:
+    if _table_exists(db, "demo_runs"):
+        row = db.execute("SELECT * FROM demo_runs ORDER BY rowid DESC LIMIT 1").fetchone()
+        if row is not None:
+            return {
+                "environment_mode": "DEMO",
+                "evidence_description": "Synthetic plant-shadow evidence",
+                "validation_domain": "local_demo_synthetic",
+                "demo_run": _decode_rows([row])[0],
+                "plant_production_authorized": False,
+            }
+    return {
+        "environment_mode": "PLANT_SHADOW",
+        "evidence_description": "Plant-shadow evidence",
+        "validation_domain": "plant_shadow",
+        "demo_run": None,
+        "plant_production_authorized": False,
+    }
+
+
 def create_app(
     database: str | Path,
     *,
@@ -108,14 +134,20 @@ def create_app(
                 ).fetchone()[0],
                 "active_alerts": db.execute("SELECT COUNT(*) FROM alerts").fetchone()[0],
                 "validation_domain": "plant_shadow",
-                "plant_production_authorized": False,
+                **_environment_payload(db),
             }
 
     @app.get("/api/v1/machines")
     def machines(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)) -> dict[str, Any]:
         with connect() as db:
+            demo_scenarios = (
+                "(SELECT GROUP_CONCAT(s.scenario_name, ', ') FROM demo_machine_scenarios s "
+                "WHERE s.machine_uid=m.machine_uid) AS demo_scenarios"
+                if _table_exists(db, "demo_machine_scenarios")
+                else "NULL AS demo_scenarios"
+            )
             rows = db.execute(
-                """
+                f"""
                 SELECT m.*,
                     (SELECT health_state_model FROM prediction_attempts p WHERE p.machine_uid=m.machine_uid ORDER BY p.prediction_timestamp DESC LIMIT 1) AS health_state_model,
                     (SELECT health_state_manufacturer FROM prediction_attempts p WHERE p.machine_uid=m.machine_uid ORDER BY p.prediction_timestamp DESC LIMIT 1) AS health_state_manufacturer,
@@ -130,6 +162,8 @@ def create_app(
                     ,(SELECT classification FROM vibration_operating_inferences v WHERE v.machine_uid=m.machine_uid ORDER BY v.ingestion_id DESC LIMIT 1) AS vibration_classification
                     ,(SELECT calibration_state FROM vibration_operating_inferences v WHERE v.machine_uid=m.machine_uid ORDER BY v.ingestion_id DESC LIMIT 1) AS vibration_calibration_state
                     ,(SELECT confidence FROM vibration_operating_inferences v WHERE v.machine_uid=m.machine_uid ORDER BY v.ingestion_id DESC LIMIT 1) AS vibration_confidence
+                    ,(SELECT COALESCE(p.warning_withhold_reason,p.critical_withhold_reason) FROM prediction_attempts p WHERE p.machine_uid=m.machine_uid ORDER BY p.ingestion_id DESC LIMIT 1) AS forecast_reason
+                    ,{demo_scenarios}
                 FROM machine_registry m ORDER BY m.machine_uid LIMIT ? OFFSET ?
                 """,
                 (limit, offset),
@@ -160,6 +194,15 @@ def create_app(
                 "ORDER BY ingestion_id DESC LIMIT 1",
                 (machine_uid,),
             ).fetchone()
+            scenarios = (
+                db.execute(
+                    "SELECT scenario_name,description,metadata_json FROM demo_machine_scenarios "
+                    "WHERE machine_uid=? ORDER BY scenario_name",
+                    (machine_uid,),
+                ).fetchall()
+                if _table_exists(db, "demo_machine_scenarios")
+                else []
+            )
             return {
                 "machine": _decode_rows([row])[0],
                 "latest_prediction": _decode_rows([latest])[0] if latest else None,
@@ -170,6 +213,7 @@ def create_app(
                 "latest_vibration_operating_inference": (
                     _decode_rows([vibration_inference])[0] if vibration_inference else None
                 ),
+                "demo_scenarios": _decode_rows(scenarios),
             }
 
     @app.get("/api/v1/machines/{machine_uid}/sensors")
@@ -196,7 +240,7 @@ def create_app(
                 "o.cumulative_operating_seconds/3600.0 AS cumulative_operating_hours,"
                 "o.reason_code AS operating_context_reason,v.classification AS vibration_classification,"
                 "v.confidence AS vibration_confidence,v.calibration_state AS vibration_calibration_state,"
-                "v.reason_code AS vibration_reason "
+                "v.reason_code AS vibration_reason,r.raw_json "
                 "FROM raw_observations r JOIN operating_context_decisions o "
                 "ON o.ingestion_id=r.ingestion_id LEFT JOIN vibration_operating_inferences v "
                 "ON v.ingestion_id=r.ingestion_id WHERE " + " AND ".join(clauses)
@@ -374,6 +418,8 @@ def create_app(
     @app.get("/api/v1/model")
     def model() -> dict[str, Any]:
         manifest = json.loads(manifest_file.read_text(encoding="utf-8")) if manifest_file and manifest_file.is_file() else None
+        with connect() as db:
+            environment = _environment_payload(db)
         return {
             "model_version": "v2.7",
             "model_artifact_sha256": sha256_file(model_file) if model_file.is_file() else None,
@@ -386,12 +432,19 @@ def create_app(
             "rul_time_basis": "OPERATING_HOURS",
             "plant_validation": "NOT_STARTED",
             "production_authorized": False,
+            **environment,
         }
 
     @app.get("/api/v1/plant-evaluation")
     def plant_evaluation() -> dict[str, Any]:
         with connect() as db:
-            return evaluate_plant(db)
+            result = evaluate_plant(db)
+            environment = _environment_payload(db)
+            if environment["environment_mode"] == "DEMO":
+                result["plant_validation_eligible"] = False
+                result["warning"] = "Synthetic demo evidence is not plant validation evidence."
+            result.update(environment)
+            return result
 
     @app.get("/api/v1/drift")
     def drift() -> dict[str, Any]:
@@ -406,6 +459,7 @@ def create_app(
         with connect() as db:
             version = db.execute("SELECT schema_version FROM schema_info WHERE singleton=1").fetchone()[0]
             watermarks = db.execute("SELECT COUNT(*) FROM source_watermarks").fetchone()[0]
+            environment = _environment_payload(db)
         return {
             "status": "OK",
             "database": "READ_ONLY_API_CONNECTED",
@@ -413,8 +467,23 @@ def create_app(
             "expected_schema_version": SCHEMA_VERSION,
             "sources_with_committed_watermark": watermarks,
             "bind_policy": "LOCALHOST_ONLY",
-            "plant_production_authorized": False,
+            **environment,
         }
+
+    @app.get("/api/v1/demo")
+    def demo_metadata() -> dict[str, Any]:
+        with connect() as db:
+            environment = _environment_payload(db)
+            scenarios = (
+                _decode_rows(
+                    db.execute(
+                        "SELECT * FROM demo_machine_scenarios ORDER BY machine_id,scenario_name"
+                    ).fetchall()
+                )
+                if _table_exists(db, "demo_machine_scenarios")
+                else []
+            )
+            return {**environment, "scenarios": scenarios}
 
     @app.get("/api/v1/audit")
     def audit(limit: int = Query(500, ge=1, le=5000), offset: int = Query(0, ge=0)) -> dict[str, Any]:
